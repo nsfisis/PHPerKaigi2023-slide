@@ -1,0 +1,1437 @@
+% {{{1 Header
+
+@require: class-slydifi/theme/akasaka
+@require: code-printer/code-design
+@require: code-printer/code-printer
+@require: code-printer/code-syntax
+@require: code-printer/code-theme
+@require: enumitem/enumitem
+@require: figbox/figbox
+
+% {{{1 Preamble
+
+% {{{2 Utilities
+
+let github-link-to-file repo ref file =
+  `https://github.com/` ^ repo ^ `/blob/` ^ ref ^ `/` ^ file
+
+% {{{2 Constants
+
+let php-src-version = `php-8.2.3`
+
+% {{{3 Quizzes
+
+% {{{4 Q1
+
+let quiz-1-q = `$x = 1;
+$y =& $x;
+$y = 42;
+echo "x = $x\n";
+// => ???
+echo "y = $y\n";
+// => ???
+
+`#
+
+let quiz-1-a = `$x = 1;
+$y =& $x;
+$y = 42;
+echo "x = $x\n";
+// => 42
+echo "y = $y\n";
+// => 42
+
+`#
+
+% {{{4 Q2
+
+let quiz-2-q = `$x = 1;
+$y =& $x;
+$z = $y;
+$z = 42;
+echo "x = $x\n";
+// => ???
+echo "y = $y\n";
+// => ???
+echo "z = $z\n";
+// => ???
+
+`#
+
+let quiz-2-a = `$x = 1;
+$y =& $x;
+$z = $y;
+$z = 42;
+echo "x = $x\n";
+// => 1
+echo "y = $y\n";
+// => 1
+echo "z = $z\n";
+// => 42
+
+`#
+
+% {{{4 Q3
+
+let quiz-3-q = `$xs = [1, 2];
+$x =& $xs[0];
+$x = 42;
+echo "x = $x\n";
+// => ???
+echo "xs = [$xs[0], $xs[1]]\n";
+// => [???, ???]
+
+`#
+
+let quiz-3-a = `$xs = [1, 2];
+$x =& $xs[0];
+$x = 42;
+echo "x = $x\n";
+// => 42
+echo "xs = [$xs[0], $xs[1]]\n";
+// => [42, 2]
+
+`#
+
+% {{{4 Q4
+
+let quiz-4-q = `$xs = [1, 2];
+$x =& $xs[0];
+$ys = $xs;
+$x = 42;
+$ys[1] = 3;
+echo "x = $x\n";
+// => ???
+echo "xs = [$xs[0], $xs[1]]\n";
+// => [???, ???]
+echo "ys = [$ys[0], $ys[1]]\n";
+// => [???, ???]
+
+`#
+
+let quiz-4-a = `$xs = [1, 2];
+$x =& $xs[0];
+$ys = $xs;
+$x = 42;
+$ys[1] = 3;
+echo "x = $x\n";
+// => 42
+echo "xs = [$xs[0], $xs[1]]\n";
+// => [42, 2]
+echo "ys = [$ys[0], $ys[1]]\n";
+// => [42, 3]
+
+`#
+
+% {{{4 Q5
+
+let quiz-5-q = `$g = 1;
+function f(&$x) {
+  $x =& $GLOBALS['g'];
+}
+$y = 0;
+f($y);
+$y = 42;
+echo "y = $y", PHP_EOL;
+// => ???
+echo "g = $g", PHP_EOL;
+// => ???
+
+`#
+
+let quiz-5-a = `$g = 1;
+function f(&$x) {
+  $x =& $GLOBALS['g'];
+}
+$y = 0;
+f($y);
+$y = 42;
+echo "y = $y", PHP_EOL;
+// => 42
+echo "g = $g", PHP_EOL;
+// => 1
+
+`#
+
+% {{{4 Q6
+
+let quiz-6-q = `class C {
+  public int $x = 1;
+}
+$c = new C();
+$y =& $c->x;
+$y = 'PHPerKaigi';
+// => ???
+
+`#
+
+let quiz-6-a = `class C {
+  public int $x = 1;
+}
+$c = new C();
+$y =& $c->x;
+$y = 'PHPerKaigi';
+// => Fatal error: TypeError
+
+`#
+
+% {{{3 php/php-src
+
+let zval-def = `struct zval {
+  zend_value value;     /* 値本体 */
+  uint32_t   type_info; /* 型情報 */
+
+  union {
+    /* その他メタデータ (省略) */
+  } u2;
+};
+
+`#
+
+let zend-value-def = `union zend_value {
+  zend_long         lval;    /* 整数 */
+  double            dval;    /* 浮動小数点数 */
+  zend_string      *str;     /* 文字列 */
+  zend_array       *arr;     /* 配列 */
+  zend_object      *obj;     /* オブジェクト */
+  zend_resource    *res;     /* リソース */
+  zend_reference   *ref;     /* 参照 */
+  /* (略) */
+};
+
+`#
+
+let zval-types = `#define IS_UNDEF          0 /* 不明、未初期化 */
+#define IS_NULL           1 /* null */
+#define IS_FALSE          2 /* false */
+#define IS_TRUE           3 /* true */
+#define IS_LONG           4 /* 整数 */
+#define IS_DOUBLE         5 /* 浮動小数点数 */
+#define IS_STRING         6 /* 文字列 */
+#define IS_ARRAY          7 /* 配列 */
+#define IS_OBJECT         8 /* オブジェクト */
+#define IS_RESOURCE       9 /* リソース */
+#define IS_REFERENCE     10 /* 参照 */
+
+`#
+
+let zend-reference-def = `struct zend_reference {
+  uint32_t   refcount;  /* 参照カウント */
+  uint32_t   type_info; /* (説明略) */
+  zval       val;       /* 指している値 */
+  zend_property_info_source_list sources;   /* (説明略) */
+};
+
+`#
+
+let zend-assign-to-variable-reference-def = `void zend_assign_to_variable_reference(
+  zval *lhs, zval *rhs
+) {
+  ZVAL_NEW_REF(rhs);
+
+  rhs->value->refcount++;
+
+  lhs->value = rhs->value;
+  lhs->type_info = IS_REFERENCE;
+}
+
+`#
+
+let zend-assign-to-variable-reference-simple = `ZVAL_NEW_REF(rhs);
+
+rhs->value->refcount++;
+
+lhs->value = rhs->value;
+lhs->type_info = IS_REFERENCE;
+
+`#
+
+let zval-new-ref-def = `ZVAL_NEW_REF(z)
+  zend_reference *ref = new zend_reference();
+  ref->refcount = 1;
+  /* z の中に入っている値を ref にコピー */
+  ZVAL_COPY_VALUE(&ref->val, z);
+  z->value = ref;
+  z->type_info = IS_REFERENCE;
+
+`#
+
+let zval-new-ref-simple = `/* ZVAL_NEW_REF */
+zend_reference *ref =
+  new zend_reference();
+ref->refcount = 1;
+ZVAL_COPY_VALUE(&ref->val, rhs);
+rhs->value = ref;
+rhs->type_info = IS_REFERENCE;
+
+`#
+
+% {{{2 Blocks
+
+let-block +code-block-php source =
+  '<
+    +code-printer?:(
+      CodePrinter.make-config CodeSyntax.php CodeTheme.iceberg-light
+      |> CodePrinter.set-number-fun CodeDesign.number-fun-null
+    )(source);
+  >
+
+let-block +code-block-c source =
+  '<
+    +code-printer?:(
+      CodePrinter.make-config CodeSyntax.c CodeTheme.iceberg-light
+      |> CodePrinter.set-number-fun CodeDesign.number-fun-null
+    )(source);
+  >
+
+let-block +fig-arrow from to =
+  let (to-x, to-y) = to in
+  '<
+    +fig-abs-pos(to)(FigBox.from-bbox-graphics [
+      Gr.line from to |> stroke 3pt Color.black;
+      Gr.polygon to [
+        (to-x -' 2.5pt, to-y +' 4.33pt);
+        (to-x +' 2.5pt, to-y +' 4.33pt);
+      ] |> stroke 3pt Color.black;
+    ]);
+  >
+
+% {{{2 Inlines
+
+let-inline \php-src-link file line-from line-to =
+  let file-with-line = file ^ `#L` ^ arabic line-from ^ `-L` ^ arabic line-to in
+  let url = github-link-to-file `php/php-src` php-src-version file-with-line in
+    {\link?:(embed-string file-with-line)(url);}
+
+% }}}
+open FigBox
+
+in
+
+% {{{1 Body
+
+document '<
+  +make-title(|
+    title = {
+      |詳説「参照」
+      |PHP の参照を完全に理解する
+      |};
+    author = {|nsfisis (いまむら)|};
+    date = {|PHPerKaigi 2023|};
+  |);
+
+  +frame{自己紹介}<
+    +p{
+      nsfisis (いまむら)
+    }
+    +p{
+      \@ デジタルサーカス株式会社
+    }
+  >
+
+  +frame{アジェンダ}<
+    +enumerate{
+      * 参照の不思議クイズ
+      * PHP処理系のソースを読む
+        ** zvalとzend_reference
+        ** 参照代入
+      * クイズの解説
+      * まとめ
+    }
+  >
+
+  +section{|参照の不思議クイズ|}<
+    +frame{参照の不思議クイズ: Q1}<
+      +code-block-php(quiz-1-q);
+    >
+
+    +frame{参照の不思議クイズ: Q1}<
+      +code-block-php(quiz-1-a);
+    >
+
+    +frame{参照の不思議クイズ: Q2}<
+      +code-block-php(quiz-2-q);
+    >
+
+    +frame{参照の不思議クイズ: Q2}<
+      +code-block-php(quiz-2-a);
+    >
+
+    +frame{参照の不思議クイズ: Q3}<
+      +code-block-php(quiz-3-q);
+    >
+
+    +frame{参照の不思議クイズ: Q3}<
+      +code-block-php(quiz-3-a);
+    >
+
+    +frame{参照の不思議クイズ: Q4}<
+      +code-block-php(quiz-4-q);
+    >
+
+    +frame{参照の不思議クイズ: Q4}<
+      +code-block-php(quiz-4-a);
+    >
+  >
+
+  +section{|PHP処理系のソースを読む|}<
+    +frame{はじめに}<
+      +listing{
+        * PHP v8.2.3 (\link?:({GitHub})(`https://github.com/php/php-src/tree/php-8.2.3`);)
+        * ソースコードは発表向けに改変しています
+        * C言語としては不正確な説明を話したり載せたりすることがあります
+      }
+    >
+
+    +section{|zvalとzend_reference|}<
+      +frame{zvalとは}<
+        +p{
+          PHPの「値」全般
+          \listing{
+            * 整数 (\inline-code(`0`);、\inline-code(`42`);、\inline-code(`57`);)
+            * 浮動小数点数 (\inline-code(`3.14159265`);)
+            * 文字列 (\inline-code(`"Hello, World!"`);)
+            * 配列 (\inline-code(`[1, 2, 3]`);)
+            * クラス (\inline-code(`new \Exception`);)
+          }
+          など
+        }
+      >
+
+      +frame{zvalの定義}<
+        +code-block-c(zval-def);
+        +p{
+          \php-src-link(`Zend/zend_types.h`)(315)(340);
+        }
+      >
+
+      +frame{zend_valueの定義}<
+        +code-block-c(zend-value-def);
+        +p{
+          \php-src-link(`Zend/zend_types.h`)(295)(313);
+        }
+      >
+
+      +frame{zend_valueの定義}<
+        +code-block-c(zend-value-def);
+        +p{
+          どれが入っているのかをどう区別する？
+        }
+      >
+
+      +frame{zvalの定義}<
+        +code-block-c(zval-def);
+        +p{
+          \inline-code(`type_info`);が型情報を保持している
+        }
+        +p{
+          この値を見て、\inline-code(`zend_value`);に何が入っているかを区別する
+        }
+        +p{
+          いわゆる"tagged-union"
+        }
+      >
+
+      +frame{PHPの型}<
+        +code-block-c(zval-types);
+        +p{
+          参照は\inline-code(`IS_REFERENCE`);
+        }
+        +p{
+          内部的には、独立した型として実装されている
+        }
+      >
+
+      +frame{PHPの型}<
+        +code-block-c(zend-value-def);
+        +p{
+          \inline-code(`zend_reference`);はどんなデータ構造か？
+        }
+      >
+
+      +frame{zend_referenceの定義}<
+        +code-block-c(zend-reference-def);
+        +p{
+          \php-src-link(`Zend/zend_types.h`)(537)(541);
+        }
+        +p{
+          参照カウント: 同じ値への参照がどれだけあるか？
+        }
+      >
+
+      +frame{具体例}<
+        +fig-on-right(
+          vconcat [
+            textbox{\$x: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: IS_LONG};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{1} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 50pt
+        )<
+          +code-block-php(`$x = 1;`);
+        >
+      >
+
+      +frame{具体例}<
+        +fig-on-right(
+          vconcat [
+            textbox{\$x: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: ???};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{???} |> vmargin 10pt |> hmargin 75pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+            gap 15pt;
+            textbox{\$y: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: ???};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{???} |> vmargin 10pt |> hmargin 75pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 50pt
+        )<
+          +code-block-php(`$x = 1;
+$y =& $x;`);
+        >
+      >
+    >
+
+    +section{|参照代入|}<
+      +frame{zend_assign_to_variable_reference}<
+        +fig-on-right(
+          vconcat [
+            textbox{\inline-code(`$lhs =& $rhs;`);};
+            gap 5pt;
+            textbox{\inline-code(`$lhs`);=左辺};
+            gap 5pt;
+            textbox{\inline-code(`$rhs`);=右辺};
+          ]
+        )<
+          +code-block-c(zend-assign-to-variable-reference-def);
+          +p{
+            \php-src-link(`Zend/zend_execute.c`)(533)(557);
+          }
+        >
+      >
+
+      +frame{ZVAL_NEW_REF}<
+        +code-block-c(zval-new-ref-def);
+        +p{
+          \php-src-link(`Zend/zend_types.h`)(1077)(1086);
+        }
+        +p{
+          \inline-code(`z`);の中身を参照でラップする
+        }
+      >
+
+      +frame{zend_assign_to_variable_reference}<
+        +code-block-c(zend-assign-to-variable-reference-def);
+      >
+
+      +frame{具体例}<
+        +fig-on-right(
+          vconcat [
+            textbox{\$rhs: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: IS_LONG};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{1} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 25pt
+        )<
+          +code-block-php(`$rhs = 1;
+$lhs =& $rhs;
+`);
+          +code-block-c(zend-assign-to-variable-reference-simple);
+        >
+      >
+
+      +frame{具体例}<
+        +fig-on-right(
+          vconcat [
+            textbox{\$rhs: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: IS_LONG};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{1} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 25pt
+        )<
+          +code-block-php(`$rhs = 1;
+$lhs =& $rhs;
+`);
+          +code-block-c(zval-new-ref-simple);
+        >
+      >
+
+      +frame{具体例}<
+        +fig-on-right(
+          vconcat [
+            textbox{\$rhs: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: IS_LONG};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{1} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+            gap 15pt;
+            textbox{zend_reference};
+            gap 5pt;
+            vconcat [
+              textbox{refcount: 1};
+              gap 10pt;
+              textbox{val: zval};
+              gap 5pt;
+              textbox{\<uninitialized\>} |> vmargin 15pt |> hmargin 25pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 20pt
+        )<
+          +code-block-php(`$rhs = 1;
+$lhs =& $rhs;
+`);
+          +code-block-c(zval-new-ref-simple);
+        >
+      >
+
+      +frame{具体例}<
+        +fig-on-right(
+          vconcat [
+            textbox{\$rhs: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: IS_LONG};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{1} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+            gap 15pt;
+            textbox{zend_reference};
+            gap 5pt;
+            vconcat [
+              textbox{refcount: 1};
+              gap 10pt;
+              textbox{val: zval};
+              gap 5pt;
+              vconcat [
+                textbox{type_info: IS_LONG};
+                gap 5pt;
+                textbox{value: zend_value};
+                gap 5pt;
+                textbox{1} |> vmargin 5pt |> hmargin 80pt |> frame 1pt (Color.gray 0.5);
+              ] |> hvmargin 5pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 20pt
+        )<
+          +code-block-php(`$rhs = 1;
+$lhs =& $rhs;
+`);
+          +code-block-c(zval-new-ref-simple);
+        >
+      >
+
+      +frame{具体例}<
+        +fig-on-right(
+          vconcat [
+            textbox{\$rhs: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: IS_REFERENCE};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 100pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+            gap 30pt;
+            textbox{zend_reference};
+            gap 5pt;
+            vconcat [
+              textbox{refcount: 1};
+              gap 10pt;
+              textbox{val: zval};
+              gap 5pt;
+              vconcat [
+                textbox{type_info: IS_LONG};
+                gap 5pt;
+                textbox{value: zend_value};
+                gap 5pt;
+                textbox{1} |> vmargin 5pt |> hmargin 80pt |> frame 1pt (Color.gray 0.5);
+              ] |> hvmargin 10pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 20pt
+        )<
+          +code-block-php(`$rhs = 1;
+$lhs =& $rhs;
+`);
+          +code-block-c(zval-new-ref-simple);
+        >
+        +fig-arrow((555pt, 250pt))((555pt, 200pt));
+      >
+
+      +frame{具体例}<
+        +fig-on-right(
+          vconcat [
+            textbox{\$rhs: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: IS_REFERENCE};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 100pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+            gap 30pt;
+            textbox{zend_reference};
+            gap 5pt;
+            vconcat [
+              textbox{refcount: 1};
+              gap 10pt;
+              textbox{val: zval};
+              gap 5pt;
+              vconcat [
+                textbox{type_info: IS_LONG};
+                gap 5pt;
+                textbox{value: zend_value};
+                gap 5pt;
+                textbox{1} |> vmargin 5pt |> hmargin 80pt |> frame 1pt (Color.gray 0.5);
+              ] |> hvmargin 10pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 20pt
+        )<
+          +code-block-php(`$rhs = 1;
+$lhs =& $rhs;
+`);
+          +code-block-c(zend-assign-to-variable-reference-simple);
+        >
+        +fig-arrow((555pt, 250pt))((555pt, 200pt));
+      >
+
+      +frame{具体例}<
+        +fig-on-right(
+          vconcat [
+            textbox{\$rhs: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: IS_REFERENCE};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 100pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+            gap 30pt;
+            textbox{zend_reference};
+            gap 5pt;
+            vconcat [
+              textbox{refcount: 2};
+              gap 10pt;
+              textbox{val: zval};
+              gap 5pt;
+              vconcat [
+                textbox{type_info: IS_LONG};
+                gap 5pt;
+                textbox{value: zend_value};
+                gap 5pt;
+                textbox{1} |> vmargin 5pt |> hmargin 80pt |> frame 1pt (Color.gray 0.5);
+              ] |> hvmargin 10pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 20pt
+        )<
+          +code-block-php(`$rhs = 1;
+$lhs =& $rhs;
+`);
+          +code-block-c(zend-assign-to-variable-reference-simple);
+        >
+        +fig-arrow((555pt, 250pt))((555pt, 200pt));
+      >
+
+      +frame{具体例}<
+        +fig-on-right(
+          vconcat [
+            textbox{\$rhs: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: IS_REFERENCE};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 100pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+            gap 30pt;
+            textbox{zend_reference};
+            gap 5pt;
+            vconcat [
+              textbox{refcount: 2};
+              gap 10pt;
+              textbox{val: zval};
+              gap 5pt;
+              vconcat [
+                textbox{type_info: IS_LONG};
+                gap 5pt;
+                textbox{value: zend_value};
+                gap 5pt;
+                textbox{1} |> vmargin 5pt |> hmargin 80pt |> frame 1pt (Color.gray 0.5);
+              ] |> hvmargin 10pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 20pt
+        )<
+          +code-block-php(`$rhs = 1;
+$lhs =& $rhs;
+`);
+          +code-block-c(zend-assign-to-variable-reference-simple);
+        >
+        +fig-abs-pos((190pt, 215pt))(
+          from-bbox-graphics [
+            Gr.rectangle (0pt, 0pt) (250pt, 140pt) |> fill (Color.of-css `#EEEEEE`)
+          ]
+        );
+        +fig-abs-pos((180pt, 225pt))(
+          vconcat [
+            textbox{\$lhs: zval};
+            gap 5pt;
+            vconcat [
+              textbox{type_info: IS_REFERENCE};
+              gap 10pt;
+              textbox{value: zend_value};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 100pt |> frame 1.5pt (Color.gray 0.25);
+            ] |> hvmargin 10pt |> frame 2pt Color.black;
+          ] |> hmargin 20pt
+        );
+        +fig-arrow((555pt, 250pt))((555pt, 200pt));
+        +fig-arrow((500pt, 217pt))((500pt, 200pt));
+        +fig-abs-pos((305pt, 217pt))(
+          from-bbox-graphics [
+            Gr.poly-line (0pt, 30pt) [(0pt, 0pt); (199pt, 0pt)] |> stroke 3pt Color.black;
+          ]
+        );
+      >
+    >
+  >
+
+  +section{|クイズの解説|}<
+    +frame{クイズの解説: Q1}<
+      +code-block-php(quiz-1-a);
+    >
+
+    +frame{クイズの解説: Q1}<
+      +fig-on-right(
+        vconcat [
+          hconcat [
+            vconcat [
+              textbox{\$y};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+            gap 20pt;
+            vconcat [
+              textbox{\$x};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 30pt;
+          textbox{zend_reference};
+          gap 5pt;
+          vconcat [
+            textbox{refcount: 2};
+            gap 10pt;
+            textbox{zval};
+            gap 5pt;
+            textbox{42} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+          ] |> hvmargin 10pt |> frame 2pt Color.black;
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-1-a);
+      >
+      +fig-arrow((610pt, 310pt))((610pt, 270pt));
+      +fig-arrow((530pt, 310pt))((530pt, 270pt));
+    >
+
+    +frame{クイズの解説: Q2}<
+      +code-block-php(quiz-2-a);
+    >
+
+    +frame{クイズの解説: Q2}<
+      +fig-on-right(
+        vconcat [
+          hconcat [
+            vconcat [
+              textbox{\$y};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+            gap 20pt;
+            vconcat [
+              textbox{\$x};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 30pt;
+          textbox{zend_reference};
+          gap 5pt;
+          vconcat [
+            textbox{refcount: 2};
+            gap 10pt;
+            textbox{zval};
+            gap 5pt;
+            textbox{1} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+          ] |> hvmargin 10pt |> frame 2pt Color.black;
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-2-a);
+      >
+      +fig-arrow((610pt, 310pt))((610pt, 270pt));
+      +fig-arrow((530pt, 310pt))((530pt, 270pt));
+    >
+
+    +frame{クイズの解説: Q2}<
+      +fig-on-right(
+        vconcat [
+          hconcat [
+            vconcat [
+              textbox{\$y};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+            gap 20pt;
+            vconcat [
+              textbox{\$x};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 30pt;
+          textbox{zend_reference};
+          gap 5pt;
+          vconcat [
+            textbox{refcount: 2};
+            gap 10pt;
+            textbox{zval};
+            gap 5pt;
+            textbox{1} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+          ] |> hvmargin 10pt |> frame 2pt Color.black;
+          gap 10pt;
+          vconcat [
+            textbox{\$z};
+            gap 5pt;
+            textbox{1} |> vmargin 15pt |> hmargin 35pt |> frame 2pt (Color.black);
+          ]
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-2-a);
+      >
+      +fig-arrow((610pt, 310pt))((610pt, 270pt));
+      +fig-arrow((530pt, 310pt))((530pt, 270pt));
+    >
+
+    +frame{クイズの解説: Q2}<
+      +fig-on-right(
+        vconcat [
+          hconcat [
+            vconcat [
+              textbox{\$y};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+            gap 20pt;
+            vconcat [
+              textbox{\$x};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 30pt;
+          textbox{zend_reference};
+          gap 5pt;
+          vconcat [
+            textbox{refcount: 2};
+            gap 10pt;
+            textbox{zval};
+            gap 5pt;
+            textbox{1} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+          ] |> hvmargin 10pt |> frame 2pt Color.black;
+          gap 10pt;
+          vconcat [
+            textbox{\$z};
+            gap 5pt;
+            textbox{42} |> vmargin 15pt |> hmargin 35pt |> frame 2pt (Color.black);
+          ]
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-2-a);
+      >
+      +fig-arrow((610pt, 310pt))((610pt, 270pt));
+      +fig-arrow((530pt, 310pt))((530pt, 270pt));
+    >
+
+    +frame{クイズの解説: Q3}<
+      +code-block-php(quiz-3-a);
+    >
+
+    +frame{クイズの解説: Q3}<
+      +fig-on-right(
+        vconcat [
+          vconcat [
+            textbox{\$xs};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          vconcat [
+            textbox{zend_array};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 50pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          hconcat [
+            vconcat [
+              textbox{zval};
+              gap 5pt;
+              textbox{1} |> vmargin 10pt |> hmargin 20pt |> frame 2pt (Color.black);
+            ];
+            gap 10pt;
+            vconcat [
+              textbox{zval};
+              gap 5pt;
+              textbox{2} |> vmargin 10pt |> hmargin 20pt |> frame 2pt (Color.black);
+            ];
+          ];
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-3-a);
+      >
+      +fig-arrow((610pt, 310pt))((610pt, 280pt));
+      +fig-arrow((595pt, 240pt))((595pt, 210pt));
+      +fig-arrow((635pt, 240pt))((635pt, 210pt));
+    >
+
+    +frame{クイズの解説: Q3}<
+      +fig-on-right(
+        vconcat [
+          vconcat [
+            textbox{\$xs};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          vconcat [
+            textbox{zend_array};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 50pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          hconcat [
+            vconcat [
+              textbox{} |> vmargin 17pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+            gap 10pt;
+            vconcat [
+              textbox{2} |> vmargin 10pt |> hmargin 20pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          textbox{zend_reference};
+          gap 5pt;
+          vconcat [
+            textbox{refcount: 1};
+            gap 10pt;
+            textbox{1} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+          ] |> hvmargin 10pt |> frame 2pt Color.black;
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-3-a);
+      >
+      +fig-arrow((530pt, 310pt))((530pt, 280pt));
+      +fig-arrow((515pt, 240pt))((515pt, 210pt));
+      +fig-arrow((555pt, 240pt))((555pt, 210pt));
+      +fig-arrow((515pt, 185pt))((515pt, 155pt));
+    >
+
+    +frame{クイズの解説: Q3}<
+      +fig-on-right(
+        vconcat [
+          hconcat [
+            vconcat [
+              textbox{\$xs};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+            gap 40pt;
+            vconcat [
+              textbox{\$x};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          vconcat [
+            textbox{zend_array};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 50pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          hconcat [
+            vconcat [
+              textbox{} |> vmargin 17pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+            gap 10pt;
+            vconcat [
+              textbox{2} |> vmargin 10pt |> hmargin 20pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          textbox{zend_reference};
+          gap 5pt;
+          vconcat [
+            textbox{refcount: 2};
+            gap 10pt;
+            textbox{1} |> vmargin 10pt |> hmargin 80pt |> frame 1.5pt (Color.gray 0.25);
+          ] |> hvmargin 10pt |> frame 2pt Color.black;
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-3-a);
+      >
+      +fig-arrow((530pt, 310pt))((530pt, 280pt));
+      +fig-arrow((515pt, 240pt))((515pt, 210pt));
+      +fig-arrow((555pt, 240pt))((555pt, 210pt));
+      +fig-arrow((515pt, 185pt))((515pt, 155pt));
+      +fig-arrow((630pt, 310pt))((630pt, 155pt));
+    >
+
+    +frame{クイズの解説: Q3}<
+      +fig-on-right(
+        vconcat [
+          hconcat [
+            vconcat [
+              textbox{\$xs};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+            gap 40pt;
+            vconcat [
+              textbox{\$x};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          vconcat [
+            textbox{zend_array};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 50pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          hconcat [
+            vconcat [
+              textbox{} |> vmargin 17pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+            gap 10pt;
+            vconcat [
+              textbox{2} |> vmargin 10pt |> hmargin 20pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          textbox{zend_reference};
+          gap 5pt;
+          vconcat [
+            textbox{refcount: 2};
+            gap 10pt;
+            textbox{42} |> vmargin 10pt |> hmargin 75pt |> frame 1.5pt (Color.gray 0.25);
+          ] |> hvmargin 10pt |> frame 2pt Color.black;
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-3-a);
+      >
+      +fig-arrow((530pt, 310pt))((530pt, 280pt));
+      +fig-arrow((515pt, 240pt))((515pt, 210pt));
+      +fig-arrow((555pt, 240pt))((555pt, 210pt));
+      +fig-arrow((515pt, 185pt))((515pt, 155pt));
+      +fig-arrow((630pt, 310pt))((630pt, 155pt));
+    >
+
+    +frame{クイズの解説: Q4}<
+      +code-block-php(quiz-4-a);
+    >
+
+    +frame{クイズの解説: Q4}<
+      +fig-on-right(
+        vconcat [
+          hconcat [
+            vconcat [
+              textbox{\$xs};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+            gap 40pt;
+            vconcat [
+              textbox{\$x};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          vconcat [
+            textbox{zend_array};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 50pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          hconcat [
+            vconcat [
+              textbox{} |> vmargin 16.5pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+            gap 10pt;
+            vconcat [
+              textbox{2} |> vmargin 10pt |> hmargin 20pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          textbox{zend_reference};
+          gap 5pt;
+          vconcat [
+            textbox{refcount: 3};
+            gap 10pt;
+            textbox{1} |> vmargin 10pt |> hmargin 70pt |> frame 1.5pt (Color.gray 0.25);
+          ] |> hvmargin 10pt |> frame 2pt Color.black;
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-4-a);
+      >
+      +fig-arrow((545pt, 310pt))((545pt, 280pt));
+      +fig-arrow((530pt, 240pt))((530pt, 210pt));
+      +fig-arrow((580pt, 240pt))((580pt, 210pt));
+      +fig-arrow((530pt, 185pt))((530pt, 155pt));
+      +fig-arrow((650pt, 310pt))((650pt, 155pt));
+    >
+
+    +frame{クイズの解説: Q4}<
+      +fig-on-right(
+        vconcat [
+          hconcat [
+            vconcat [
+              textbox{\$xs};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+            gap 40pt;
+            vconcat [
+              textbox{\$x};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          vconcat [
+            textbox{zend_array};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 50pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          hconcat [
+            vconcat [
+              textbox{} |> vmargin 16.5pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+            gap 10pt;
+            vconcat [
+              textbox{2} |> vmargin 10pt |> hmargin 20pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          textbox{zend_reference};
+          gap 5pt;
+          vconcat [
+            textbox{refcount: 3};
+            gap 10pt;
+            textbox{1} |> vmargin 10pt |> hmargin 70pt |> frame 1.5pt (Color.gray 0.25);
+          ] |> hvmargin 10pt |> frame 2pt Color.black;
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-4-a);
+      >
+      +fig-abs-pos((360pt, 155pt))(
+        from-bbox-graphics [
+          Gr.rectangle (0pt, 0pt) (125pt, 200pt) |> fill (Color.of-css `#EEEEEE`)
+        ]
+      );
+      +fig-abs-pos((350pt, 170pt))(
+        vconcat [
+          vconcat [
+            textbox{\$ys};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          vconcat [
+            textbox{zend_array};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 50pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          hconcat [
+            vconcat [
+              textbox{} |> vmargin 16.5pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+            gap 10pt;
+            vconcat [
+              textbox{2} |> vmargin 10pt |> hmargin 20pt |> frame 2pt (Color.black);
+            ];
+          ];
+        ] |> hmargin 20pt
+      );
+      +fig-arrow((545pt, 310pt))((545pt, 280pt));
+      +fig-arrow((530pt, 240pt))((530pt, 210pt));
+      +fig-arrow((580pt, 240pt))((580pt, 210pt));
+      +fig-arrow((530pt, 185pt))((530pt, 155pt));
+      +fig-arrow((650pt, 310pt))((650pt, 155pt));
+      +fig-arrow((405pt, 310pt))((405pt, 280pt));
+      +fig-arrow((390pt, 240pt))((390pt, 210pt));
+      +fig-arrow((440pt, 240pt))((440pt, 210pt));
+      +fig-arrow((510pt, 165pt))((510pt, 155pt));
+      +fig-abs-pos((392pt, 165pt))(
+        from-bbox-graphics [
+          Gr.poly-line (0pt, 20pt) [(0pt, 0pt); (122pt, 0pt)] |> stroke 3pt Color.black;
+        ]
+      );
+    >
+
+    +frame{クイズの解説: Q4}<
+      +fig-on-right(
+        vconcat [
+          hconcat [
+            vconcat [
+              textbox{\$xs};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+            ];
+            gap 40pt;
+            vconcat [
+              textbox{\$x};
+              gap 5pt;
+              textbox{} |> vmargin 15pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          vconcat [
+            textbox{zend_array};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 50pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          hconcat [
+            vconcat [
+              textbox{} |> vmargin 16.5pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+            gap 10pt;
+            vconcat [
+              textbox{2} |> vmargin 10pt |> hmargin 20pt |> frame 2pt (Color.black);
+            ];
+          ];
+          gap 20pt;
+          textbox{zend_reference};
+          gap 5pt;
+          vconcat [
+            textbox{refcount: 3};
+            gap 10pt;
+            textbox{42} |> vmargin 10pt |> hmargin 65pt |> frame 1.5pt (Color.gray 0.25);
+          ] |> hvmargin 10pt |> frame 2pt Color.black;
+        ] |> hmargin 20pt
+      )<
+        +code-block-php(quiz-4-a);
+      >
+      +fig-abs-pos((360pt, 155pt))(
+        from-bbox-graphics [
+          Gr.rectangle (0pt, 0pt) (125pt, 200pt) |> fill (Color.of-css `#EEEEEE`)
+        ]
+      );
+      +fig-abs-pos((350pt, 170pt))(
+        vconcat [
+          vconcat [
+            textbox{\$ys};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 40pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          vconcat [
+            textbox{zend_array};
+            gap 5pt;
+            textbox{} |> vmargin 15pt |> hmargin 50pt |> frame 2pt (Color.black);
+          ];
+          gap 20pt;
+          hconcat [
+            vconcat [
+              textbox{} |> vmargin 16.5pt |> hmargin 24pt |> frame 2pt (Color.black);
+            ];
+            gap 10pt;
+            vconcat [
+              textbox{3} |> vmargin 10pt |> hmargin 20pt |> frame 2pt (Color.black);
+            ];
+          ];
+        ] |> hmargin 20pt
+      );
+      +fig-arrow((545pt, 310pt))((545pt, 280pt));
+      +fig-arrow((530pt, 240pt))((530pt, 210pt));
+      +fig-arrow((580pt, 240pt))((580pt, 210pt));
+      +fig-arrow((530pt, 185pt))((530pt, 155pt));
+      +fig-arrow((650pt, 310pt))((650pt, 155pt));
+      +fig-arrow((405pt, 310pt))((405pt, 280pt));
+      +fig-arrow((390pt, 240pt))((390pt, 210pt));
+      +fig-arrow((440pt, 240pt))((440pt, 210pt));
+      +fig-arrow((510pt, 165pt))((510pt, 155pt));
+      +fig-abs-pos((392pt, 165pt))(
+        from-bbox-graphics [
+          Gr.poly-line (0pt, 20pt) [(0pt, 0pt); (122pt, 0pt)] |> stroke 3pt Color.black;
+        ]
+      );
+    >
+  >
+
+  +frame{まとめ}<
+    +listing{
+      * Cが読めると世界が広がる
+        ** PHP、Apache httpd、MySQL等
+      * PHPの処理系を気軽に読もう
+    }
+  >
+
+  +section{|おまけ|}<
+    +section{|入り切らなかったクイズ|}<
+      +frame{参照の不思議クイズ: Q5}<
+        +code-block-php(quiz-5-q);
+      >
+
+      +frame{参照の不思議クイズ: Q5}<
+        +code-block-php(quiz-5-a);
+      >
+
+      +frame{参照の不思議クイズ: Q6}<
+        +code-block-php(quiz-6-q);
+      >
+
+      +frame{参照の不思議クイズ: Q6}<
+        +code-block-php(quiz-6-a);
+      >
+    >
+  >
+>
+
+% vim: fdm=marker fdl=99
