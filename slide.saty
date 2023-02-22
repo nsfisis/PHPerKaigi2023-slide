@@ -246,13 +246,13 @@ lhs->type_info = IS_REFERENCE;
 
 `#
 
-let zval-new-ref-def = `ZVAL_NEW_REF(z)
+let zval-new-ref-def = `ZVAL_NEW_REF(rhs)
   zend_reference *ref = new zend_reference();
   ref->refcount = 1;
-  /* z の中に入っている値を ref にコピー */
-  ZVAL_COPY_VALUE(&ref->val, z);
-  z->value = ref;
-  z->type_info = IS_REFERENCE;
+  /* rhs の中に入っている値を ref にコピー */
+  ZVAL_COPY_VALUE(&ref->val, rhs);
+  rhs->value = ref;
+  rhs->type_info = IS_REFERENCE;
 
 `#
 
@@ -379,6 +379,9 @@ document '<
       +listing{
         * PHP v8.2.3 (\link?:({GitHub})(`https://github.com/php/php-src/tree/php-8.2.3`);)
         * ソースコードは発表向けに改変しています
+          ** 本スライドに掲載したコード片には、以下のライセンスが適用されます。
+
+          ** https://github.com/php/php-src/blob/php-8.2.3/LICENSE
         * C言語としては不正確な説明を話したり載せたりすることがあります
       }
     >
@@ -531,7 +534,7 @@ $y =& $x;`);
           \php-src-link(`Zend/zend_types.h`)(1077)(1086);
         }
         +p{
-          \inline-code(`z`);の中身を参照でラップする
+          \inline-code(`rhs`);の中身を参照でラップする
         }
       >
 
